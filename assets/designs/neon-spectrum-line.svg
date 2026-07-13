@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="180" viewBox="0 0 1200 180" fill="none">
+  <title>WaveBar Neon Spectrum Line skin</title>
+  <desc>Transparent active-state design reference for the irregular neon spectrum-line skin.</desc>
+  <defs>
+    <linearGradient id="wavebar-line-gradient" x1="80" y1="0" x2="1120" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#D62CFF"/>
+      <stop offset="0.34" stop-color="#956DFF"/>
+      <stop offset="0.62" stop-color="#6387FF"/>
+      <stop offset="1" stop-color="#26E7E1"/>
+    </linearGradient>
+    <filter id="soft-aura" x="-10%" y="-70%" width="120%" height="240%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="4.5"/>
+    </filter>
+  </defs>
+
+  <path id="spectrum-shape"
+        d="M80 145
+           L94 144 L108 141 L122 143 L136 138 L150 134 L164 139 L178 142
+           L192 137 L206 140 L220 135 L234 139 L248 133 L262 137 L276 131
+           L290 136 L304 128 L318 134 L332 126 L346 132 L360 122 L374 130
+           L388 116 L398 70 L408 28 L418 106 L430 131 L442 119 L454 126
+           L466 110 L478 86 L490 121 L502 104 L514 134 L526 127 L538 132
+           L550 124 L562 131 L574 119 L586 126 L598 114 L608 58 L618 22
+           L628 112 L640 124 L652 116 L664 128 L676 121 L688 94 L700 129
+           L712 117 L724 132 L736 125 L748 129 L760 111 L772 121 L784 116
+           L796 95 L808 126 L820 120 L832 132 L844 128 L856 122 L868 127
+           L880 118 L892 126 L904 121 L916 129 L928 124 L940 131 L952 128
+           L964 134 L976 130 L988 136 L1000 132 L1012 137 L1024 134
+           L1036 139 L1048 136 L1060 141 L1072 138 L1084 143 L1096 140
+           L1108 144 L1120 145"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <use href="#spectrum-shape" stroke="url(#wavebar-line-gradient)" stroke-width="10" opacity="0.16" filter="url(#soft-aura)"/>
+  <use href="#spectrum-shape" stroke="url(#wavebar-line-gradient)" stroke-width="3.5" opacity="0.30"/>
+  <use href="#spectrum-shape" stroke="url(#wavebar-line-gradient)" stroke-width="1.35" opacity="0.98"/>
+
+  <path d="M80 145 H1120" stroke="url(#wavebar-line-gradient)" stroke-width="1" stroke-linecap="round" opacity="0.22"/>
+</svg>

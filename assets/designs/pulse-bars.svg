@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="180" viewBox="0 0 1200 180" fill="none">
+  <title>WaveBar Pulse Bars skin</title>
+  <desc>Transparent active-state design reference for the rounded spectrum-bar skin.</desc>
+  <defs>
+    <linearGradient id="wavebar-gradient" x1="108" y1="0" x2="1092" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#956DFF"/>
+      <stop offset="0.5" stop-color="#6F8CFF"/>
+      <stop offset="1" stop-color="#4DE4C2"/>
+    </linearGradient>
+    <filter id="wavebar-glow" x="-20%" y="-80%" width="140%" height="260%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="5" result="outer-blur"/>
+      <feColorMatrix in="outer-blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .22 0" result="outer-glow"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="inner-glow"/>
+      <feMerge>
+        <feMergeNode in="outer-glow"/>
+        <feMergeNode in="inner-glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#wavebar-glow)" fill="url(#wavebar-gradient)">
+    <rect x="108"  y="142" width="8" height="12" rx="4"/>
+    <rect x="128"  y="136" width="8" height="18" rx="4"/>
+    <rect x="148"  y="128" width="8" height="26" rx="4"/>
+    <rect x="168"  y="119" width="8" height="35" rx="4"/>
+    <rect x="188"  y="123" width="8" height="31" rx="4"/>
+    <rect x="208"  y="128" width="8" height="26" rx="4"/>
+    <rect x="228"  y="125" width="8" height="29" rx="4"/>
+    <rect x="248"  y="115" width="8" height="39" rx="4"/>
+    <rect x="268"  y="101" width="8" height="53" rx="4"/>
+    <rect x="288"  y="83"  width="8" height="71" rx="4"/>
+    <rect x="308"  y="57"  width="8" height="97" rx="4"/>
+    <rect x="328"  y="72"  width="8" height="82" rx="4"/>
+    <rect x="348"  y="97"  width="8" height="57" rx="4"/>
+    <rect x="368"  y="112" width="8" height="42" rx="4"/>
+    <rect x="388"  y="105" width="8" height="49" rx="4"/>
+    <rect x="408"  y="118" width="8" height="36" rx="4"/>
+    <rect x="428"  y="130" width="8" height="24" rx="4"/>
+    <rect x="448"  y="121" width="8" height="33" rx="4"/>
+    <rect x="468"  y="104" width="8" height="50" rx="4"/>
+    <rect x="488"  y="86"  width="8" height="68" rx="4"/>
+    <rect x="508"  y="69"  width="8" height="85" rx="4"/>
+    <rect x="528"  y="80"  width="8" height="74" rx="4"/>
+    <rect x="548"  y="95"  width="8" height="59" rx="4"/>
+    <rect x="568"  y="110" width="8" height="44" rx="4"/>
+    <rect x="588"  y="89"  width="8" height="65" rx="4"/>
+    <rect x="608"  y="61"  width="8" height="93" rx="4"/>
+    <rect x="628"  y="74"  width="8" height="80" rx="4"/>
+    <rect x="648"  y="101" width="8" height="53" rx="4"/>
+    <rect x="668"  y="113" width="8" height="41" rx="4"/>
+    <rect x="688"  y="99"  width="8" height="55" rx="4"/>
+    <rect x="708"  y="73"  width="8" height="81" rx="4"/>
+    <rect x="728"  y="46"  width="8" height="108" rx="4"/>
+    <rect x="748"  y="67"  width="8" height="87" rx="4"/>
+    <rect x="768"  y="94"  width="8" height="60" rx="4"/>
+    <rect x="788"  y="112" width="8" height="42" rx="4"/>
+    <rect x="808"  y="97"  width="8" height="57" rx="4"/>
+    <rect x="828"  y="78"  width="8" height="76" rx="4"/>
+    <rect x="848"  y="91"  width="8" height="63" rx="4"/>
+    <rect x="868"  y="108" width="8" height="46" rx="4"/>
+    <rect x="888"  y="120" width="8" height="34" rx="4"/>
+    <rect x="908"  y="112" width="8" height="42" rx="4"/>
+    <rect x="928"  y="101" width="8" height="53" rx="4"/>
+    <rect x="948"  y="115" width="8" height="39" rx="4"/>
+    <rect x="968"  y="125" width="8" height="29" rx="4"/>
+    <rect x="988"  y="130" width="8" height="24" rx="4"/>
+    <rect x="1008" y="135" width="8" height="19" rx="4"/>
+    <rect x="1028" y="140" width="8" height="14" rx="4"/>
+    <rect x="1048" y="144" width="8" height="10" rx="4"/>
+  </g>
+
+  <rect x="108" y="153" width="948" height="1.5" rx="0.75" fill="url(#wavebar-gradient)" opacity="0.72"/>
+</svg>
