@@ -2,6 +2,7 @@
 #include "resource.h"
 
 #include <algorithm>
+#include <string>
 
 namespace wavebar {
 namespace {
@@ -19,7 +20,26 @@ constexpr UINT kCommandNeonLine = 1001;
 constexpr UINT kCommandPulseBars = 1002;
 constexpr UINT kCommandAdjustPosition = 1003;
 constexpr UINT kCommandTopmost = 1004;
+constexpr UINT kCommandAutoStart = 1005;
 constexpr UINT kCommandExit = 1099;
+
+constexpr wchar_t kRunKeyPath[] =
+    L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+constexpr wchar_t kRunValueName[] = L"WaveBar";
+
+std::wstring GetExecutableCommand() {
+    std::array<wchar_t, 32768> path{};
+    const DWORD length = GetModuleFileNameW(
+        nullptr,
+        path.data(),
+        static_cast<DWORD>(path.size()));
+
+    if (length == 0 || length >= path.size()) {
+        return {};
+    }
+
+    return L"\"" + std::wstring(path.data(), length) + L"\"";
+}
 
 }  // namespace
 
@@ -205,6 +225,11 @@ void Application::ShowTrayMenu() {
         MF_STRING | (topmost_ ? MF_CHECKED : 0),
         kCommandTopmost,
         L"Always on Top");
+    AppendMenuW(
+        menu,
+        MF_STRING | (IsAutoStartEnabled() ? MF_CHECKED : 0),
+        kCommandAutoStart,
+        L"Start with Windows");
     AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
     AppendMenuW(menu, MF_STRING, kCommandExit, L"Exit");
 
@@ -242,12 +267,136 @@ void Application::HandleCommand(UINT command) {
         case kCommandTopmost:
             SetTopmost(!topmost_);
             break;
+        case kCommandAutoStart: {
+            const bool enable = !IsAutoStartEnabled();
+            if (!SetAutoStartEnabled(enable)) {
+                MessageBoxW(
+                    window_,
+                    enable
+                        ? L"WaveBar could not be added to Windows startup."
+                        : L"WaveBar could not be removed from Windows startup.",
+                    kApplicationName,
+                    MB_OK | MB_ICONERROR);
+            }
+            break;
+        }
         case kCommandExit:
             DestroyWindow(window_);
             break;
         default:
             break;
     }
+}
+
+bool Application::IsAutoStartEnabled() const {
+    const std::wstring expectedCommand = GetExecutableCommand();
+    if (expectedCommand.empty()) {
+        return false;
+    }
+
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            kRunKeyPath,
+            0,
+            KEY_QUERY_VALUE,
+            &key) != ERROR_SUCCESS) {
+        return false;
+    }
+
+    DWORD type = 0;
+    DWORD byteCount = 0;
+    LONG result = RegQueryValueExW(
+        key,
+        kRunValueName,
+        nullptr,
+        &type,
+        nullptr,
+        &byteCount);
+
+    if (result != ERROR_SUCCESS || type != REG_SZ || byteCount < sizeof(wchar_t)) {
+        RegCloseKey(key);
+        return false;
+    }
+
+    std::wstring storedCommand(byteCount / sizeof(wchar_t), L'\0');
+    result = RegQueryValueExW(
+        key,
+        kRunValueName,
+        nullptr,
+        &type,
+        reinterpret_cast<BYTE*>(storedCommand.data()),
+        &byteCount);
+    RegCloseKey(key);
+
+    if (result != ERROR_SUCCESS) {
+        return false;
+    }
+
+    while (!storedCommand.empty() && storedCommand.back() == L'\0') {
+        storedCommand.pop_back();
+    }
+
+    return CompareStringOrdinal(
+               storedCommand.c_str(),
+               -1,
+               expectedCommand.c_str(),
+               -1,
+               TRUE) == CSTR_EQUAL;
+}
+
+bool Application::SetAutoStartEnabled(bool enabled) const {
+    HKEY key = nullptr;
+    LONG result = ERROR_SUCCESS;
+
+    if (enabled) {
+        const std::wstring command = GetExecutableCommand();
+        if (command.empty()) {
+            return false;
+        }
+
+        result = RegCreateKeyExW(
+            HKEY_CURRENT_USER,
+            kRunKeyPath,
+            0,
+            nullptr,
+            REG_OPTION_NON_VOLATILE,
+            KEY_SET_VALUE,
+            nullptr,
+            &key,
+            nullptr);
+        if (result == ERROR_SUCCESS) {
+            result = RegSetValueExW(
+                key,
+                kRunValueName,
+                0,
+                REG_SZ,
+                reinterpret_cast<const BYTE*>(command.c_str()),
+                static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
+        }
+    } else {
+        result = RegOpenKeyExW(
+            HKEY_CURRENT_USER,
+            kRunKeyPath,
+            0,
+            KEY_SET_VALUE,
+            &key);
+        if (result == ERROR_FILE_NOT_FOUND) {
+            return true;
+        }
+        if (result == ERROR_SUCCESS) {
+            result = RegDeleteValueW(key, kRunValueName);
+            if (result == ERROR_FILE_NOT_FOUND) {
+                result = ERROR_SUCCESS;
+            }
+        }
+    }
+
+    if (key != nullptr) {
+        RegCloseKey(key);
+    }
+
+    return result == ERROR_SUCCESS && IsAutoStartEnabled() == enabled;
 }
 
 void Application::SetAdjustingPosition(bool adjusting) {

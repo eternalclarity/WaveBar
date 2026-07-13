@@ -27,6 +27,8 @@ private:
     void RemoveTrayIcon();
     void ShowTrayMenu();
     void HandleCommand(UINT command);
+    bool IsAutoStartEnabled() const;
+    bool SetAutoStartEnabled(bool enabled) const;
     void SetAdjustingPosition(bool adjusting);
     void SetTopmost(bool topmost);
     void SetSkin(SkinType skin);

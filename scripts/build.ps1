@@ -84,6 +84,7 @@ $arguments += @(
     "-lshell32",
     "-luser32",
     "-lgdi32",
+    "-ladvapi32",
     "-o",
     $output
 )

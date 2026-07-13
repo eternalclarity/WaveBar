@@ -71,6 +71,7 @@ Rounded gradient spectrum bars
 - **Desktop and always-on-top modes**: Blend into the wallpaper or remain visible above other windows.
 - **Drag, lock, and click-through**: Position the component, then keep it out of the way of desktop interaction.
 - **System tray controls**: All essential actions are available from the tray icon.
+- **Start with Windows**: Enable it from the tray menu for the current user, with no administrator privileges required.
 - **Smart sleep and wake**: Reduces update frequency when no valid audio is detected and wakes automatically when music resumes.
 - **Single-instance and high-DPI support**: Designed for modern Windows desktops.
 - **Portable single file**: No installer or third-party runtime required.
@@ -87,6 +88,7 @@ Right-click the WaveBar tray icon:
 | Pulse Bars | Rounded spectrum-bar skin |
 | Adjust Position | Unlock and drag the component |
 | Always on Top | Toggle always-on-top mode |
+| Start with Windows | Toggle automatic launch after signing in to Windows |
 | Exit | Close WaveBar |
 
 Double-click the tray icon to switch skins quickly.
