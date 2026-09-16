@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cwchar>
 
 #include <audioclient.h>
 #include <avrt.h>
@@ -48,6 +49,24 @@ bool IsPcmFormat(const WAVEFORMATEX& format) {
     return false;
 }
 
+bool IsCurrentEndpoint(IMMDeviceEnumerator* enumerator, LPCWSTR sessionDeviceId) {
+    IMMDevice* currentDevice = nullptr;
+    LPWSTR currentId = nullptr;
+    DWORD state = 0;
+    HRESULT result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &currentDevice);
+    if (SUCCEEDED(result)) {
+        result = currentDevice->GetState(&state);
+    }
+    if (SUCCEEDED(result)) {
+        result = currentDevice->GetId(&currentId);
+    }
+    const bool current = SUCCEEDED(result) && state == DEVICE_STATE_ACTIVE &&
+        currentId != nullptr && std::wcscmp(currentId, sessionDeviceId) == 0;
+    CoTaskMemFree(currentId);
+    SafeRelease(currentDevice);
+    return current;
+}
+
 }  // namespace
 
 WasapiLoopback::~WasapiLoopback() {
@@ -55,27 +74,35 @@ WasapiLoopback::~WasapiLoopback() {
 }
 
 bool WasapiLoopback::Start(HWND notificationWindow, UINT activityMessage) {
-    if (running_.exchange(true)) {
+    if (running_.load()) {
         return true;
     }
 
+    // A failed worker may have exited but still owns a joinable std::thread.
+    Stop();
+    ResetSamples();
     notificationWindow_ = notificationWindow;
     activityMessage_ = activityMessage;
     stopEvent_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    restartEvent_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
 
-    if (stopEvent_ == nullptr) {
+    if (stopEvent_ == nullptr || restartEvent_ == nullptr) {
         Stop();
         return false;
     }
 
-    thread_ = std::thread(&WasapiLoopback::CaptureThread, this);
+    running_.store(true);
+    try {
+        thread_ = std::thread(&WasapiLoopback::CaptureThread, this);
+    } catch (...) {
+        Stop();
+        return false;
+    }
     return true;
 }
 
 void WasapiLoopback::Stop() {
-    if (!running_.exchange(false)) {
-        return;
-    }
+    running_.store(false);
 
     if (stopEvent_ != nullptr) {
         SetEvent(stopEvent_);
@@ -89,6 +116,27 @@ void WasapiLoopback::Stop() {
         CloseHandle(stopEvent_);
         stopEvent_ = nullptr;
     }
+    if (restartEvent_ != nullptr) {
+        CloseHandle(restartEvent_);
+        restartEvent_ = nullptr;
+    }
+    ResetSamples();
+}
+
+void WasapiLoopback::RequestRestart() {
+    if (restartEvent_ != nullptr) {
+        SetEvent(restartEvent_);
+    }
+}
+
+void WasapiLoopback::ResetSamples() {
+    std::lock_guard lock(bufferMutex_);
+    ringBuffer_.fill(0.0f);
+    writePosition_ = 0;
+    availableSamples_ = 0;
+    rms_.store(0.0f, std::memory_order_relaxed);
+    activitySignaled_ = false;
+    silentFrameCount_ = 0;
 }
 
 bool WasapiLoopback::CopyLatestSamples(
@@ -130,9 +178,12 @@ void WasapiLoopback::CaptureThread() {
 
     DWORD taskIndex = 0;
     HANDLE multimediaTask = AvSetMmThreadCharacteristicsW(L"Pro Audio", &taskIndex);
+    const HANDLE events[] = {stopEvent_, restartEvent_};
 
     while (running_.load(std::memory_order_relaxed)) {
-        if (!CaptureSession() && WaitForSingleObject(stopEvent_, 750) == WAIT_OBJECT_0) {
+        const bool succeeded = CaptureSession();
+        ResetSamples();
+        if (!succeeded && WaitForMultipleObjects(2, events, FALSE, 750) == WAIT_OBJECT_0) {
             break;
         }
     }
@@ -150,6 +201,7 @@ bool WasapiLoopback::CaptureSession() {
     IAudioClient* audioClient = nullptr;
     IAudioCaptureClient* captureClient = nullptr;
     WAVEFORMATEX* format = nullptr;
+    LPWSTR deviceId = nullptr;
     bool sessionStarted = false;
 
     HRESULT result = CoCreateInstance(
@@ -160,6 +212,9 @@ bool WasapiLoopback::CaptureSession() {
 
     if (SUCCEEDED(result)) {
         result = enumerator->GetDefaultAudioEndpoint(eRender, eConsole, &device);
+    }
+    if (SUCCEEDED(result)) {
+        result = device->GetId(&deviceId);
     }
     if (SUCCEEDED(result)) {
         result = device->Activate(
@@ -192,16 +247,45 @@ bool WasapiLoopback::CaptureSession() {
         sampleRate_.store(format->nSamplesPerSec, std::memory_order_relaxed);
 
         bool captureActive = true;
+        const HANDLE events[] = {stopEvent_, restartEvent_};
+        ULONGLONG lastPacketTick = GetTickCount64();
+        ULONGLONG lastEndpointCheckTick = lastPacketTick;
+        bool samplesCleared = false;
 
         while (captureActive && running_.load(std::memory_order_relaxed)) {
-            if (WaitForSingleObject(stopEvent_, 10) == WAIT_OBJECT_0) {
+            if (WaitForMultipleObjects(2, events, FALSE, 10) != WAIT_TIMEOUT) {
                 break;
+            }
+
+            const ULONGLONG now = GetTickCount64();
+            // Drivers can keep returning S_OK with no packets after resume. Silence
+            // also produces no packets, so clear stale samples early and use a
+            // longer timeout before recreating the stream as a recovery fallback.
+            if (now - lastPacketTick >= 300 && !samplesCleared) {
+                ResetSamples();
+                samplesCleared = true;
+            }
+            if (now - lastPacketTick >= 5000) {
+                break;
+            }
+            // A valid stream can remain attached to the old default device forever.
+            // Polling also covers missed device notifications during logon/resume.
+            if (now - lastEndpointCheckTick >= 1000) {
+                lastEndpointCheckTick = now;
+                if (!IsCurrentEndpoint(enumerator, deviceId)) {
+                    break;
+                }
             }
 
             UINT32 packetFrames = 0;
             result = captureClient->GetNextPacketSize(&packetFrames);
 
-            while (SUCCEEDED(result) && packetFrames > 0) {
+            while (SUCCEEDED(result) && packetFrames > 0 &&
+                   running_.load(std::memory_order_relaxed)) {
+                if (WaitForSingleObject(restartEvent_, 0) == WAIT_OBJECT_0) {
+                    captureActive = false;
+                    break;
+                }
                 BYTE* data = nullptr;
                 UINT32 frames = 0;
                 DWORD flags = 0;
@@ -224,7 +308,13 @@ bool WasapiLoopback::CaptureSession() {
                     *format,
                     (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0);
 
-                captureClient->ReleaseBuffer(frames);
+                lastPacketTick = GetTickCount64();
+                samplesCleared = false;
+                result = captureClient->ReleaseBuffer(frames);
+                if (FAILED(result)) {
+                    captureActive = false;
+                    break;
+                }
                 result = captureClient->GetNextPacketSize(&packetFrames);
             }
 
@@ -245,6 +335,7 @@ bool WasapiLoopback::CaptureSession() {
     SafeRelease(audioClient);
     SafeRelease(device);
     SafeRelease(enumerator);
+    CoTaskMemFree(deviceId);
 
     return SUCCEEDED(result);
 }

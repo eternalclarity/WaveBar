@@ -53,6 +53,7 @@ private:
     bool animationRunning_ = false;
     ULONGLONG lastActivityTick_ = 0;
     UINT taskbarCreatedMessage_ = 0;
+    HPOWERNOTIFY suspendResumeNotification_ = nullptr;
 };
 
 }  // namespace wavebar

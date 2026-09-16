@@ -135,6 +135,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1 -Configu
 
 Output: build/release/WaveBar.exe
 
+Run audio recovery regression tests with simulated devices (no system audio or power changes):
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
+~~~
+
+On real hardware, verify recovery while playing music after changing the default output,
+sleep/resume, and signing in again. Stale samples are cleared when packets stop; after
+5 seconds without packets, capture is recreated. Unavailable devices are retried automatically.
+
 ---
 
 <div align="center">

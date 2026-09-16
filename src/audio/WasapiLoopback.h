@@ -24,6 +24,8 @@ public:
 
     bool Start(HWND notificationWindow, UINT activityMessage);
     void Stop();
+    // Called on the window thread; rebuilding WASAPI stays on the capture thread.
+    void RequestRestart();
 
     bool CopyLatestSamples(
         std::array<float, kAnalysisSampleCount>& destination,
@@ -35,6 +37,7 @@ private:
 
     void CaptureThread();
     bool CaptureSession();
+    void ResetSamples();
     void WriteSamples(const BYTE* data, UINT32 frames, const WAVEFORMATEX& format, bool silent);
     float ReadChannelSample(const BYTE* frame, const WAVEFORMATEX& format, UINT32 channel) const;
     void UpdateActivity(float blockRms, UINT32 frames, UINT32 sampleRate);
@@ -48,6 +51,7 @@ private:
     std::atomic<bool> running_{false};
     std::thread thread_;
     HANDLE stopEvent_ = nullptr;
+    HANDLE restartEvent_ = nullptr;
     HWND notificationWindow_ = nullptr;
     UINT activityMessage_ = 0;
     bool activitySignaled_ = false;

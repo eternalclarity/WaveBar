@@ -12,6 +12,7 @@ constexpr wchar_t kApplicationName[] = L"WaveBar";
 constexpr UINT kTrayCallbackMessage = WM_APP + 1;
 constexpr UINT kAudioActivityMessage = WM_APP + 2;
 constexpr UINT_PTR kRenderTimerId = 1;
+constexpr UINT_PTR kTrayRetryTimerId = 2;
 constexpr UINT kRenderIntervalMilliseconds = 33;
 constexpr UINT kIdlePollIntervalMilliseconds = 250;
 constexpr ULONGLONG kIdleDelayMilliseconds = 700;
@@ -62,9 +63,10 @@ bool Application::Initialize(HINSTANCE instance) {
 
     PositionInitially();
 
-    if (!AddTrayIcon()) {
-        return false;
-    }
+    // Explorer may not have created its notification area yet at logon.
+    AddTrayIcon();
+    suspendResumeNotification_ = RegisterSuspendResumeNotification(
+        window_, DEVICE_NOTIFY_WINDOW_HANDLE);
 
     ShowWindow(window_, SW_SHOWNOACTIVATE);
     SetWindowPos(
@@ -170,9 +172,11 @@ bool Application::AddTrayIcon() {
     wcscpy_s(trayData_.szTip, L"WaveBar");
 
     if (!Shell_NotifyIconW(NIM_ADD, &trayData_)) {
+        SetTimer(window_, kTrayRetryTimerId, 1000, nullptr);
         return false;
     }
 
+    KillTimer(window_, kTrayRetryTimerId);
     trayData_.uVersion = NOTIFYICON_VERSION_4;
     Shell_NotifyIconW(NIM_SETVERSION, &trayData_);
     return true;
@@ -508,7 +512,7 @@ LRESULT CALLBACK Application::WindowProcedure(
 }
 
 LRESULT Application::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
-    if (message == taskbarCreatedMessage_) {
+    if (taskbarCreatedMessage_ != 0 && message == taskbarCreatedMessage_) {
         AddTrayIcon();
         return 0;
     }
@@ -533,8 +537,22 @@ LRESULT Application::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
         case WM_TIMER:
             if (wParam == kRenderTimerId) {
                 UpdateSpectrum();
+            } else if (wParam == kTrayRetryTimerId) {
+                AddTrayIcon();
             }
             return 0;
+
+        case WM_POWERBROADCAST:
+            if (wParam == PBT_APMRESUMEAUTOMATIC ||
+                wParam == PBT_APMRESUMESUSPEND ||
+                wParam == PBT_APMRESUMECRITICAL) {
+                audio_.RequestRestart();
+                lastActivityTick_ = GetTickCount64();
+                StartAnimation();
+                Render();
+                return TRUE;
+            }
+            break;
 
         case WM_NCHITTEST:
             if (adjustingPosition_) {
@@ -549,6 +567,11 @@ LRESULT Application::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
 
         case WM_DESTROY:
             KillTimer(window_, kRenderTimerId);
+            KillTimer(window_, kTrayRetryTimerId);
+            if (suspendResumeNotification_ != nullptr) {
+                UnregisterSuspendResumeNotification(suspendResumeNotification_);
+                suspendResumeNotification_ = nullptr;
+            }
             animationRunning_ = false;
             audio_.Stop();
             RemoveTrayIcon();
@@ -557,8 +580,9 @@ LRESULT Application::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
             return 0;
 
         default:
-            return DefWindowProcW(window_, message, wParam, lParam);
+            break;
     }
+    return DefWindowProcW(window_, message, wParam, lParam);
 }
 
 }  // namespace wavebar
